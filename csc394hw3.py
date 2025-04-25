@@ -1,3 +1,9 @@
+import openai
+import os
+
+openai.api_key = os.getenv("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")  # Or replace with your key directly
+# openai.api_key = "sk-..."
+
 from fastapi import FastAPI
 from pydantic import BaseModel
 
@@ -70,3 +76,30 @@ async def add_listing(listing: JobListing):
 async def delete_listing(index: int = 0):
     listing_list.pop(index)
     return {"listings": listing_list}
+
+@app.get("/recommendation")
+async def get_recommendation(username: str):
+    user = next((u for u in user_list if u.username == username), None)
+    if not user:
+        return {"error": "User not found"}
+
+    job_descriptions = "\n".join([f"{j.title} in {j.location}, {j.type}, requires {j.experience}, salary: {j.salary}" for j in listing_list])
+    
+    prompt = (
+        f"Given the following user: {user.first_name} {user.last_name}, "
+        f"recommend one suitable job from the following listings:\n\n{job_descriptions}\n\n"
+        f"Respond with just the recommended job title and a short reason."
+    )
+
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a helpful career assistant."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        reply = response.choices[0].message.content.strip()
+        return {"recommendation": reply}
+    except Exception as e:
+        return {"error": str(e)}
